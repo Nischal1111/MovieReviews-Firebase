@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie List</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>Movie Review</h2>
+        <div>
+            <select id="sortOptions">
+                <option value="name">Sort by Name (A-Z)</option>
+                <option value="name-reverse">Sort by Name (Z-A)</option>
+                <option value="rating">Sort by Rating (0-5)</option>
+                <option value="rating-reverse">Sort by Rating (5-0)</option>
+                <option value="director">Sort by Director (A-Z)</option>
+                <option value="director-reverse">Sort by Director (Z-A)</option>
+                <option value="newestDate">Sort by Newest date</option>
+                <option value="oldestDate">Sort by Latest date</option>
+            </select>
+            <button id="sortBtn">Sort</button>
+        </div>
+        <div id="ratingLimitMessage" style="color: red; margin-top: 10px;"></div>
+
+        <table id="reviewList">
+            <thead>
+                <tr>
+                    <th>Movie Name</th>
+                    <th>Rating</th>
+                    <th>Director</th>
+                    <th>Release Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <form id="addMovieForm">
+            <input type="hidden" id="docId">
+            <input type="text" id="movieName" placeholder="Movie Name">
+            <input type="number" id="rating" placeholder="Rating (0-5)" min="0" max="5">
+            <input type="text" id="director" placeholder="Director">
+            <input type="date" id="releaseDate" placeholder="Release Date">
+            <button type="button" id="btn">Add</button>
+        </form>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBqn5DhFRXdRA_0Plm6vtz2betnpLZY7-A",
+            authDomain: "nischal-2358556.firebaseapp.com",
+            projectId: "nischal-2358556",
+            storageBucket: "nischal-2358556.appspot.com",
+            messagingSenderId: "766152205401",
+            appId: "1:766152205401:web:f44d569742983e6bcb7d48",
+            measurementId: "G-BJ6QZJF6VK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let unsubscribe;
+
+        // Add event listener to sort button
+        document.getElementById('sortBtn').addEventListener('click', () => {
+            const sortOption = document.getElementById('sortOptions').value;
+            let q;
+            switch (sortOption) {
+                case 'name':
+                    q = query(collection(db, "Movie_Review"), orderBy("movie_name"));
+                    break;
+                case 'name-reverse':
+                    q = query(collection(db, "Movie_Review"), orderBy("movie_name","desc"));
+                    break;
+                case 'rating':
+                    q = query(collection(db, "Movie_Review"), orderBy("rating"));
+                    break;
+                case 'rating-reverse':
+                    q = query(collection(db, "Movie_Review"), orderBy("rating","desc"));
+                    break;
+                case 'director':
+                    q = query(collection(db, "Movie_Review"), orderBy("director"));
+                    break;
+                case 'director-reverse':
+                    q = query(collection(db, "Movie_Review"), orderBy("director","desc"));
+                    break;
+                case 'newestDate':
+                    q = query(collection(db, "Movie_Review"), orderBy("release_date"));
+                    break;
+                case 'oldestDate':
+                    q = query(collection(db, "Movie_Review"), orderBy("release_date","desc"));
+                    break;
+                default:
+                    break;
+            }
+            updateSnapshot(q);
+        });
+
+        // Function to update snapshot based on new query
+        function updateSnapshot(q) {
+            unsubscribe(); // Unsubscribe from previous snapshot
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                const table = document.getElementById('reviewList').getElementsByTagName('tbody')[0];
+                table.innerHTML = ''; // Clear existing rows
+                snapshot.forEach((doc) => {
+                    const newRow = table.insertRow();
+
+                    // Add movie details cells
+                    newRow.innerHTML = `<td>${doc.data().movie_name}</td><td>${doc.data().rating}</td><td>${doc.data().director}</td><td>${doc.data().release_date}</td>`;
+
+                    // Add edit and delete buttons
+                    const actionsCell = newRow.insertCell();
+                    const editButton = document.createElement('button');
+                    editButton.classList.add("edit-button")
+                    editButton.textContent = 'Edit';
+
+                    editButton.addEventListener('click', () => {
+                        // Populate form fields with existing movie details
+                        document.getElementById('docId').value = doc.id;
+                        document.getElementById('movieName').value = doc.data().movie_name;
+                        document.getElementById('rating').value = doc.data().rating;
+                        document.getElementById('director').value = doc.data().director;
+                        document.getElementById('releaseDate').value = doc.data().release_date;
+                        // Change submit button text to 'Update'
+                        document.getElementById('btn').textContent = 'Update';
+                    });
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.classList.add("del-button");
+                    deleteButton.addEventListener('click', () => {
+                        // Implement delete functionality here
+                        deleteMovie(doc.id);
+                    });
+
+                    actionsCell.appendChild(editButton);
+                    actionsCell.appendChild(deleteButton);
+                });
+            });
+        }
+
+        // Initial snapshot to load data on page load
+        const q = query(collection(db, "Movie_Review"), orderBy("movie_name"));
+        unsubscribe = onSnapshot(q, (snapshot) => {
+            const table = document.getElementById('reviewList').getElementsByTagName('tbody')[0];
+            table.innerHTML = ''; // Clear existing rows
+            snapshot.forEach((doc) => {
+                const newRow = table.insertRow();
+
+                // Add movie details cells
+                newRow.innerHTML = `<td>${doc.data().movie_name}</td><td>${doc.data().rating}</td><td>${doc.data().director}</td><td>${doc.data().release_date}</td>`;
+
+                // Add edit and delete buttons
+                const actionsCell = newRow.insertCell();
+                const editButton = document.createElement('button');
+                editButton.classList.add("edit-button")
+                editButton.textContent = 'Edit';
+                editButton.addEventListener('click', () => {
+                    // Populate form fields with existing movie details
+                    document.getElementById('docId').value = doc.id;
+                    document.getElementById('movieName').value = doc.data().movie_name;
+                    document.getElementById('rating').value = doc.data().rating;
+                    document.getElementById('director').value = doc.data().director;
+                    document.getElementById('releaseDate').value = doc.data().release_date;
+                    // Change submit button text to 'Update'
+                    document.getElementById('btn').textContent = 'Update';
+                });
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.classList.add("del-button");
+                deleteButton.addEventListener('click', () => {
+                    // Implement delete functionality here
+                    deleteMovie(doc.id);
+                });
+
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+            });
+        });
+
+        // Function to add a new movie
+        document.querySelector("#btn").addEventListener('click', (event) => {
+            event.preventDefault();
+            const docId = document.getElementById('docId').value;
+            const movieName = document.getElementById('movieName').value;
+            const rating = parseInt(document.getElementById('rating').value);
+            const director = document.getElementById('director').value;
+            const releaseDate = document.getElementById('releaseDate').value;
+            if (rating > 5) {
+                document.getElementById('ratingLimitMessage').textContent = "Rating must be between 0 and 5";
+                setTimeout(()=>{
+                    document.getElementById('ratingLimitMessage').textContent = "";
+                },3000)
+                return;
+            }
+            addMovie(movieName, rating, director, releaseDate);
+            // Reset form fields and button text
+            document.getElementById('docId').value = '';
+            document.getElementById('movieName').value = '';
+            document.getElementById('rating').value = '';
+            document.getElementById('director').value = '';
+            document.getElementById('releaseDate').value = '';
+            document.getElementById('btn').textContent = 'Add';
+        });
+
+        // Function to add a new movie to Firestore
+        function addMovie(movieName, rating, director, releaseDate) {
+            addDoc(collection(db, "Movie_Review"), {
+                movie_name: movieName,
+                rating: rating,
+                director: director,
+                release_date: releaseDate
+            });
+        }
+
+        // Function to update an existing movie in Firestore
+        function updateMovie(docId, movieName, rating, director, releaseDate) {
+            const movieRef = doc(db, "Movie_Review", docId);
+            updateDoc(movieRef, {
+                movie_name: movieName,
+                rating: rating,
+                director: director,
+                release_date: releaseDate
+            });
+        }
+
+        // Function to delete a movie from Firestore
+        async function deleteMovie(docId) {
+            try {
+                await deleteDoc(doc(db, "Movie_Review", docId));
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+            }
+        }
+    </script>
+</body>
+
+</html>

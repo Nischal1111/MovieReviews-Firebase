@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f7f7f7;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        form {
+            margin-top: 20px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"] {
+            width: calc(50% - 10px);
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin-right: .5rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>Movie Review</h2>
+
+        <table id="reviewList">
+            <thead>
+                <tr>
+                    <th>Movie Name</th>
+                    <th>Rating</th>
+                    <th>Director</th>
+                    <th>Release Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table rows will be added dynamically here -->
+            </tbody>
+        </table>
+
+        <form id="addMovieForm">
+            <input type="hidden" id="docId"> <!-- Hidden input to store document ID -->
+            <input type="text" id="movieName" placeholder="Movie Name">
+            <input type="number" id="rating" placeholder="Rating (0-5)" min="0" max="5">
+            <input type="text" id="director" placeholder="Director">
+            <input type="date" id="releaseDate" placeholder="Release Date">
+            <button type="button" id="btn">Add</button>
+        </form>
+    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+                apiKey: "AIzaSyBqn5DhFRXdRA_0Plm6vtz2betnpLZY7-A",
+                authDomain: "nischal-2358556.firebaseapp.com",
+                projectId: "nischal-2358556",
+                storageBucket: "nischal-2358556.appspot.com",
+                messagingSenderId: "766152205401",
+                appId: "1:766152205401:web:f44d569742983e6bcb7d48",
+                measurementId: "G-BJ6QZJF6VK"
+            };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const q = query(collection(db, "Movie_Review"), orderBy("movie_name"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const table = document.getElementById('reviewList').getElementsByTagName('tbody')[0];
+            table.innerHTML = ''; // Clear existing rows
+            snapshot.forEach((doc) => {
+                const newRow = table.insertRow();
+
+                // Add movie details cells
+                newRow.innerHTML = `<td>${doc.data().movie_name}</td><td>${doc.data().rating}</td><td>${doc.data().director}</td><td>${doc.data().release_date}</td>`;
+
+                // Add edit and delete buttons
+                const actionsCell = newRow.insertCell();
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.addEventListener('click', () => {
+                    // Populate form fields with existing movie details
+                    document.getElementById('docId').value = doc.id;
+                    document.getElementById('movieName').value = doc.data().movie_name;
+                    document.getElementById('rating').value = doc.data().rating;
+                    document.getElementById('director').value = doc.data().director;
+                    document.getElementById('releaseDate').value = doc.data().release_date;
+                    // Change submit button text to 'Update'
+                    document.getElementById('btn').textContent = 'Update';
+                });
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.addEventListener('click', () => {
+                    // Implement delete functionality here
+                    deleteMovie(doc.id);
+                });
+
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+            });
+        });
+
+        document.querySelector("#btn").addEventListener('click', (event) => {
+            event.preventDefault();
+            const docId = document.getElementById('docId').value;
+            const movieName = document.getElementById('movieName').value;
+            const rating = parseInt(document.getElementById('rating').value);
+            const director = document.getElementById('director').value;
+            const releaseDate = document.getElementById('releaseDate').value;
+            if (docId) {
+                // If docId exists, update movie
+                updateMovie(docId, movieName, rating, director, releaseDate);
+            } else {
+                // Otherwise, add new movie
+                addMovie(movieName, rating, director, releaseDate);
+            }
+            // Reset form fields and button text
+            document.getElementById('docId').value = '';
+            document.getElementById('movieName').value = '';
+            document.getElementById('rating').value = '';
+            document.getElementById('director').value = '';
+            document.getElementById('releaseDate').value = '';
+            document.getElementById('btn').textContent = 'Add';
+        });
+
+        function addMovie(movieName, rating, director, releaseDate) {
+            addDoc(collection(db, "Movie_Review"), {
+                movie_name: movieName,
+                rating: rating,
+                director: director,
+                release_date: releaseDate
+            });
+        }
+
+        function updateMovie(docId, movieName, rating, director, releaseDate) {
+            const movieRef = doc(db, "Movie_Review", docId);
+            updateDoc(movieRef, {
+                movie_name: movieName,
+                rating: rating,
+                director: director,
+                release_date: releaseDate
+            });
+        }
+
+        async function deleteMovie(docId) {
+            try {
+                await deleteDoc(doc(db, "Movie_Review", docId));
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+            }
+        }
+    </script>
+</body>
+
+</html>
